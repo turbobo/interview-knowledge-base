@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JVM 垃圾回收全景图</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #f5f5f0;
+    --card-bg: #ffffff;
+    --text: #1a1a1a;
+    --text-secondary: #666;
+    --algo-color: #1565c0;
+    --algo-bg: #e3f2fd;
+    --algo-border: #90caf9;
+    --collector-color: #6a1b9a;
+    --collector-bg: #f3e5f5;
+    --collector-border: #ce93d8;
+    --theory-color: #2e7d32;
+    --theory-bg: #e8f5e9;
+    --theory-border: #a5d6a7;
+    --tuning-color: #e65100;
+    --tuning-bg: #fff3e0;
+    --tuning-border: #ffcc80;
+    --danger: #c62828;
+    --safe: #2e7d32;
+    --accent: #d4553a;
+    --radius: 12px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', 'Noto Sans SC', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 40px 24px;
+    line-height: 1.6;
+  }
+
+  .container { max-width: 1200px; margin: 0 auto; }
+
+  /* Header */
+  .header { text-align: center; margin-bottom: 48px; }
+  .header h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px; }
+  .header .subtitle { font-size: 14px; color: var(--text-secondary); }
+  .header .source { font-size: 12px; color: #999; margin-top: 4px; }
+
+  /* Legend */
+  .legend { display: flex; justify-content: center; gap: 24px; margin-bottom: 36px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+  .legend-dot.theory { background: var(--theory-color); }
+  .legend-dot.algo { background: var(--algo-color); }
+  .legend-dot.collector { background: var(--collector-color); }
+  .legend-dot.tuning { background: var(--tuning-color); }
+
+  /* Section Title */
+  .section-title {
+    font-size: 18px; font-weight: 700; margin-bottom: 16px; padding-left: 12px;
+    border-left: 4px solid; display: flex; align-items: center; gap: 8px;
+  }
+  .section-title .tag { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; color: #fff; }
+  .section-title.theory { border-color: var(--theory-color); color: var(--theory-color); }
+  .section-title.theory .tag { background: var(--theory-color); }
+  .section-title.algo { border-color: var(--algo-color); color: var(--algo-color); }
+  .section-title.algo .tag { background: var(--algo-color); }
+  .section-title.collector { border-color: var(--collector-color); color: var(--collector-color); }
+  .section-title.collector .tag { background: var(--collector-color); }
+  .section-title.tuning { border-color: var(--tuning-color); color: var(--tuning-color); }
+  .section-title.tuning .tag { background: var(--tuning-color); }
+
+  /* Cards */
+  .cards { display: grid; gap: 16px; margin-bottom: 40px; }
+  .cards.col-3 { grid-template-columns: repeat(3, 1fr); }
+  .cards.col-2 { grid-template-columns: repeat(2, 1fr); }
+  .cards.col-4 { grid-template-columns: repeat(4, 1fr); }
+  .cards.col-1 { grid-template-columns: 1fr; }
+
+  .card {
+    background: var(--card-bg); border-radius: var(--radius); border: 1.5px solid #e0e0e0;
+    padding: 20px; box-shadow: var(--shadow); position: relative; overflow: hidden;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+  .card.theory::before { background: var(--theory-color); }
+  .card.algo::before { background: var(--algo-color); }
+  .card.collector::before { background: var(--collector-color); }
+  .card.tuning::before { background: var(--tuning-color); }
+
+  .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .card-name { font-size: 16px; font-weight: 700; }
+  .card-name-en { font-size: 11px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
+
+  .card-body { font-size: 13px; color: var(--text-secondary); line-height: 1.7; }
+  .card-body .label { font-weight: 600; color: var(--text); margin-right: 4px; }
+  .card-body .row { margin-bottom: 6px; }
+
+  code { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: #f0f0f0; padding: 1px 5px; border-radius: 3px; color: var(--accent); }
+
+  /* Badge */
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
+  .badge.young { background: #e8f5e9; color: #2e7d32; }
+  .badge.old { background: #e3f2fd; color: #1565c0; }
+  .badge.both { background: #f3e5f5; color: #6a1b9a; }
+  .badge.removed { background: #ffebee; color: #c62828; }
+  .badge.default { background: #fff3e0; color: #e65100; }
+
+  /* GC Roots Diagram */
+  .roots-diagram {
+    background: #f8f9fa; border-radius: 8px; padding: 16px; margin-top: 12px;
+    border: 1px solid #e0e0e0;
+  }
+  .roots-diagram .root-title {
+    font-size: 13px; font-weight: 700; text-align: center; margin-bottom: 12px;
+    color: var(--theory-color);
+  }
+  .roots-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .root-item {
+    display: flex; align-items: center; gap: 8px; font-size: 12px;
+    padding: 6px 10px; background: #fff; border-radius: 6px; border: 1px solid #e8e8e8;
+  }
+  .root-item .icon { font-size: 16px; flex-shrink: 0; }
+
+  /* Reference Types */
+  .ref-types { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  .ref-type {
+    text-align: center; padding: 12px 8px; border-radius: 8px; border: 1.5px solid;
+  }
+  .ref-type.strong { border-color: #c62828; background: #ffebee; }
+  .ref-type.soft { border-color: #e65100; background: #fff3e0; }
+  .ref-type.weak { border-color: #1565c0; background: #e3f2fd; }
+  .ref-type.phantom { border-color: #666; background: #f5f5f5; }
+  .ref-type .ref-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .ref-type .ref-desc { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+  .ref-type.strong .ref-name { color: #c62828; }
+  .ref-type.soft .ref-name { color: #e65100; }
+  .ref-type.weak .ref-name { color: #1565c0; }
+  .ref-type.phantom .ref-name { color: #666; }
+
+  /* Algorithm Comparison */
+  .algo-compare {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px;
+  }
+  .algo-card {
+    padding: 16px; border-radius: 8px; border: 1.5px solid var(--algo-border);
+    background: var(--algo-bg);
+  }
+  .algo-card .algo-name { font-size: 14px; font-weight: 700; color: var(--algo-color); margin-bottom: 8px; }
+  .algo-card .algo-detail { font-size: 12px; color: var(--text-secondary); line-height: 1.7; }
+  .algo-card .algo-detail .label { font-weight: 600; color: var(--text); }
+
+  /* Collector Timeline */
+  .collector-timeline { position: relative; padding-left: 24px; margin-top: 12px; }
+  .collector-timeline::before {
+    content: ''; position: absolute; left: 8px; top: 0; bottom: 0;
+    width: 2px; background: #e0e0e0;
+  }
+  .ct-node { position: relative; margin-bottom: 16px; padding-left: 20px; }
+  .ct-node:last-child { margin-bottom: 0; }
+  .ct-node::before {
+    content: ''; position: absolute; left: -20px; top: 6px;
+    width: 10px; height: 10px; border-radius: 50%;
+    border: 2px solid var(--collector-color); background: #fff;
+  }
+  .ct-node.active::before { background: var(--collector-color); }
+  .ct-node.removed::before { background: #ccc; border-color: #ccc; }
+  .ct-name { font-size: 14px; font-weight: 700; color: var(--collector-color); margin-bottom: 2px; display: flex; align-items: center; gap: 8px; }
+  .ct-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.7; }
+
+  /* GC Types Table */
+  .gc-table {
+    width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px;
+  }
+  .gc-table th {
+    text-align: left; padding: 10px 16px; background: #fafafa;
+    font-weight: 600; border-bottom: 1px solid #e0e0e0;
+  }
+  .gc-table td { padding: 10px 16px; border-bottom: 1px solid #f0f0f0; color: var(--text-secondary); }
+  .gc-table tr:last-child td { border-bottom: none; }
+
+  /* Tuning Params */
+  .params-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px; }
+  .param-item {
+    display: flex; gap: 8px; padding: 8px 12px; background: #fff;
+    border-radius: 6px; border: 1px solid #e8e8e8; font-size: 12px; align-items: baseline;
+  }
+  .param-item code { flex-shrink: 0; }
+  .param-item .param-desc { color: var(--text-secondary); }
+
+  /* Promotion Flow */
+  .promo-flow {
+    display: flex; align-items: center; justify-content: center; gap: 0;
+    margin-top: 16px; flex-wrap: wrap;
+  }
+  .promo-step {
+    padding: 10px 16px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    text-align: center; min-width: 100px;
+  }
+  .promo-step.eden { background: #e8f5e9; color: #2e7d32; border: 1.5px solid #a5d6a7; }
+  .promo-step.minor { background: #fff3e0; color: #e65100; border: 1.5px solid #ffcc80; }
+  .promo-step.survivor { background: #e3f2fd; color: #1565c0; border: 1.5px solid #90caf9; }
+  .promo-step.old { background: #f3e5f5; color: #6a1b9a; border: 1.5px solid #ce93d8; }
+  .promo-arrow { font-size: 18px; color: #999; padding: 0 6px; }
+
+  .footer { text-align: center; font-size: 12px; color: #bbb; padding-top: 20px; border-top: 1px solid #e0e0e0; }
+
+  @media (max-width: 768px) {
+    .cards.col-3, .cards.col-4 { grid-template-columns: 1fr; }
+    .cards.col-2 { grid-template-columns: 1fr; }
+    .ref-types { grid-template-columns: repeat(2, 1fr); }
+    .algo-compare { grid-template-columns: 1fr; }
+    .params-grid { grid-template-columns: 1fr; }
+    body { padding: 20px 12px; }
+  }
+  @media print { body { padding: 0; background: #fff; } .card:hover { transform: none; box-shadow: none; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>JVM 垃圾回收全景图</h1>
+    <div class="subtitle">Garbage Collection — 存活判断 · 回收算法 · 收集器演进 · 调优参数</div>
+    <div class="source">来源：JavaGuide · javaguide.cn/java/jvm/jvm-garbage-collection.html</div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot theory"></div>基础理论</div>
+    <div class="legend-item"><div class="legend-dot algo"></div>回收算法</div>
+    <div class="legend-item"><div class="legend-dot collector"></div>垃圾收集器</div>
+    <div class="legend-item"><div class="legend-dot tuning"></div>调优参数</div>
+  </div>
+
+  <!-- ========== 1. 存活判断 ========== -->
+  <div class="section-title theory">
+    对象存活判断
+    <span class="tag">基础理论</span>
+  </div>
+
+  <div class="cards col-2">
+    <div class="card theory">
+      <div class="card-header">
+        <div>
+          <div class="card-name">可达性分析算法</div>
+          <div class="card-name-en">Reachability Analysis</div>
+        </div>
+        <div class="badge both">主流方案</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="label">原理：</span>从 GC Roots 出发，沿引用链向下搜索，无引用链的对象即为可回收</div>
+        <div class="row"><span class="label">优势：</span>解决引用计数法的循环引用缺陷</div>
+        <div class="row"><span class="label">废弃常量：</span>无人引用的常量会被清理</div>
+        <div class="row"><span class="label">无用类判定：</span>① 实例全清 ② ClassLoader 被回收 ③ Class 对象无引用（三个条件同时满足）</div>
+
+        <div class="roots-diagram">
+          <div class="root-title">GC Roots 类型</div>
+          <div class="roots-grid">
+            <div class="root-item"><span class="icon">📌</span> 虚拟机栈中的局部变量</div>
+            <div class="root-item"><span class="icon">🔒</span> 同步锁（synchronized）持有的对象</div>
+            <div class="root-item"><span class="icon">📋</span> 方法区中的静态属性引用</div>
+            <div class="root-item"><span class="icon">🔗</span> 方法区中的常量引用</div>
+            <div class="root-item"><span class="icon">🖥️</span> Native 方法栈中的引用</div>
+            <div class="root-item"><span class="icon">📦</span> 基本类型的 Class 对象</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card theory">
+      <div class="card-header">
+        <div>
+          <div class="card-name">四种引用类型</div>
+          <div class="card-name-en">Reference Types</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="ref-types">
+          <div class="ref-type strong">
+            <div class="ref-name">强引用</div>
+            <div class="ref-desc">绝不回收<br>普通赋值<br><code>Object o = new Object()</code></div>
+          </div>
+          <div class="ref-type soft">
+            <div class="ref-name">软引用</div>
+            <div class="ref-desc">内存告急时回收<br>适合做缓存<br><code>SoftReference</code></div>
+          </div>
+          <div class="ref-type weak">
+            <div class="ref-name">弱引用</div>
+            <div class="ref-desc">下次 GC 即回收<br>WeakHashMap<br><code>WeakReference</code></div>
+          </div>
+          <div class="ref-type phantom">
+            <div class="ref-name">虚引用</div>
+            <div class="ref-desc">随时可回收<br>配合队列处理清理工作<br><code>PhantomReference</code></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 2. 回收算法 ========== -->
+  <div class="section-title algo">
+    垃圾回收算法
+    <span class="tag">核心算法</span>
+  </div>
+
+  <div class="cards col-1">
+    <div class="card algo">
+      <div class="algo-compare">
+        <div class="algo-card">
+          <div class="algo-name">标记-清除</div>
+          <div class="algo-detail">
+            <div class="row"><span class="label">原理：</span>标记存活对象，清除未标记对象</div>
+            <div class="row"><span class="label">优点：</span>实现简单</div>
+            <div class="row"><span class="label">缺点：</span>产生大量内存碎片</div>
+            <div class="row"><span class="label">适用：</span>基础算法，很少单独使用</div>
+          </div>
+        </div>
+        <div class="algo-card">
+          <div class="algo-name">复制算法</div>
+          <div class="algo-detail">
+            <div class="row"><span class="label">原理：</span>内存分两块，存活对象复制到另一块</div>
+            <div class="row"><span class="label">优点：</span>无碎片，分配高效</div>
+            <div class="row"><span class="label">缺点：</span>可用空间减半</div>
+            <div class="row"><span class="label">适用：</span>新生代（存活率低，复制成本小）</div>
+          </div>
+        </div>
+        <div class="algo-card">
+          <div class="algo-name">标记-整理</div>
+          <div class="algo-detail">
+            <div class="row"><span class="label">原理：</span>标记存活对象，向一端移动，清理边界外</div>
+            <div class="row"><span class="label">优点：</span>无碎片</div>
+            <div class="row"><span class="label">缺点：</span>移动对象开销大</div>
+            <div class="row"><span class="label">适用：</span>老年代（存活率高，不适合复制）</div>
+          </div>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:12px; font-size:12px; color:var(--text-secondary);">
+        <strong>分代收集策略</strong>：新生代用复制算法（存活率低）· 老年代用标记-整理或标记-清除（存活率高）
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 3. 内存分配与晋升 ========== -->
+  <div class="section-title theory">
+    内存分配与晋升机制
+    <span class="tag">基础理论</span>
+  </div>
+
+  <div class="cards col-1">
+    <div class="card theory">
+      <div class="card-body">
+        <div class="row"><span class="label">优先分配：</span>新对象在 Eden 区创建，空间不足时触发 Minor GC</div>
+        <div class="row"><span class="label">大对象策略：</span>占用大量连续内存的对象直接进老年代；G1 中超过 Region 一半的 Humongous Object 也直接入老年代</div>
+        <div class="row"><span class="label">年龄晋升：</span>对象存活经过 GC 后年龄 +1，达到 <code>-XX:MaxTenuringThreshold</code> 时晋升老年代</div>
+        <div class="row"><span class="label">动态年龄：</span>Survivor 区同年龄对象总大小超过 Survivor 空间一半时，≥ 该年龄的对象直接晋升</div>
+        <div class="row"><span class="label">空间分配担保：</span>Minor GC 前确认老年代剩余空间足以容纳新生代全部对象或历次晋升平均值</div>
+
+        <div style="margin-top:12px; font-size:12px; font-weight:600; color:var(--theory-color);">对象晋升流程：</div>
+        <div class="promo-flow">
+          <div class="promo-step eden">Eden 区<br><span style="font-size:10px;font-weight:400">新对象分配</span></div>
+          <div class="promo-arrow">→</div>
+          <div class="promo-step minor">Minor GC<br><span style="font-size:10px;font-weight:400">存活检查</span></div>
+          <div class="promo-arrow">→</div>
+          <div class="promo-step survivor">Survivor 区<br><span style="font-size:10px;font-weight:400">年龄 +1</span></div>
+          <div class="promo-arrow">→</div>
+          <div class="promo-step old">老年代<br><span style="font-size:10px;font-weight:400">年龄达标 / 大对象</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 4. GC 类别 ========== -->
+  <div class="section-title algo">
+    GC 类别
+    <span class="tag">Minor / Major / Full</span>
+  </div>
+
+  <div class="cards col-1">
+    <div class="card algo">
+      <table class="gc-table">
+        <thead>
+          <tr><th>GC 类型</th><th>回收范围</th><th>触发条件</th><th>停顿时间</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Minor GC</strong></td>
+            <td>仅新生代</td>
+            <td>Eden 区空间不足</td>
+            <td>较短</td>
+          </tr>
+          <tr>
+            <td><strong>Major GC</strong></td>
+            <td>仅老年代</td>
+            <td>老年代空间不足</td>
+            <td>较长</td>
+          </tr>
+          <tr>
+            <td><strong>Full GC</strong></td>
+            <td>整堆 + 方法区</td>
+            <td>老年代/方法区不足、显式调用 <code>System.gc()</code>、CMS concurrent mode failure</td>
+            <td>最长</td>
+          </tr>
+          <tr>
+            <td><strong>Mixed GC（G1）</strong></td>
+            <td>新生代 + 部分老年代</td>
+            <td>老年代占用达到阈值</td>
+            <td>可控</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========== 5. 垃圾收集器演进 ========== -->
+  <div class="section-title collector">
+    垃圾收集器演进
+    <span class="tag">从 Serial 到 ZGC</span>
+  </div>
+
+  <div class="cards col-1">
+    <div class="card collector">
+      <div class="collector-timeline">
+        <div class="ct-node removed">
+          <div class="ct-name">Serial / Serial Old <div class="badge young">新生代 / 老年代</div></div>
+          <div class="ct-desc">单线程收集器，Stop The World 停顿。简单高效，适合客户端模式（<code>-XX:+UseSerialGC</code>）。Serial 用于新生代（复制），Serial Old 用于老年代（标记-整理）。</div>
+        </div>
+        <div class="ct-node">
+          <div class="ct-name">ParNew <div class="badge young">新生代</div></div>
+          <div class="ct-desc">Serial 的多线程版本，常搭配 CMS 使用。多核环境下性能优于 Serial。</div>
+        </div>
+        <div class="ct-node">
+          <div class="ct-name">Parallel Scavenge / Old <div class="badge both">JDK 8 默认</div></div>
+          <div class="ct-desc">关注吞吐量（而非停顿时间）。自适应调节策略（<code>-XX:+UseAdaptiveSizePolicy</code>）自动调整堆大小和晋升阈值。<code>-XX:+UseParallelGC</code> 启用。</div>
+        </div>
+        <div class="ct-node removed">
+          <div class="ct-name">CMS（Concurrent Mark Sweep） <div class="badge old">老年代</div> <div class="badge removed">JDK 14 移除</div></div>
+          <div class="ct-desc">追求低停顿的并发收集器。四阶段：初始标记（STW）→ 并发标记 → 重新标记（STW）→ 并发清除。缺点：内存碎片、浮动垃圾、CPU 敏感。</div>
+        </div>
+        <div class="ct-node active">
+          <div class="ct-name">G1（Garbage-First） <div class="badge both">JDK 9+ 默认</div></div>
+          <div class="ct-desc">基于 Region 划分（默认 ~2048 个 Region，每个 1-32MB）。支持可预测停顿（<code>-XX:MaxGCPauseMillis</code>）。Mixed GC 同时回收新生代和部分老年代。Humongous Region 存放大对象。</div>
+        </div>
+        <div class="ct-node active">
+          <div class="ct-name">ZGC <div class="badge both">超低停顿</div></div>
+          <div class="ct-desc">毫秒级停顿（< 10ms），支持超大堆（TB 级）。着色指针 + 读屏障实现并发转移。Java 21 引入分代 ZGC，进一步降低停顿。</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px; padding: 12px; background: #f8f9fa; border-radius: 8px; font-size: 12px; color: var(--text-secondary); text-align: center;">
+        <strong style="color: var(--collector-color);">选型建议</strong>：
+        JDK 8 → Parallel GC（默认） ·
+        JDK 9+ → G1（默认） ·
+        超低延迟 → ZGC ·
+        客户端 → Serial GC
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 6. 收集器对比 ========== -->
+  <div class="section-title collector">
+    收集器速查对比
+    <span class="tag">一张表看清</span>
+  </div>
+
+  <div class="cards col-1">
+    <div class="card collector">
+      <table class="gc-table">
+        <thead>
+          <tr><th>收集器</th><th>作用区域</th><th>算法</th><th>线程</th><th>停顿</th><th>状态</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Serial</strong></td><td>新生代</td><td>复制</td><td>单线程</td><td>STW</td><td>可用</td></tr>
+          <tr><td><strong>Serial Old</strong></td><td>老年代</td><td>标记-整理</td><td>单线程</td><td>STW</td><td>可用</td></tr>
+          <tr><td><strong>ParNew</strong></td><td>新生代</td><td>复制</td><td>多线程</td><td>STW</td><td>可用</td></tr>
+          <tr><td><strong>Parallel Scavenge</strong></td><td>新生代</td><td>复制</td><td>多线程</td><td>STW</td><td>JDK8 默认</td></tr>
+          <tr><td><strong>Parallel Old</strong></td><td>老年代</td><td>标记-整理</td><td>多线程</td><td>STW</td><td>JDK8 默认</td></tr>
+          <tr><td><strong>CMS</strong></td><td>老年代</td><td>标记-清除</td><td>并发</td><td>低停顿</td><td style="color:var(--danger)">JDK14 移除</td></tr>
+          <tr><td><strong>G1</strong></td><td>整堆</td><td>Region 复制+整理</td><td>并发</td><td>可控停顿</td><td style="color:var(--safe)">JDK9+ 默认</td></tr>
+          <tr><td><strong>ZGC</strong></td><td>整堆</td><td>并发转移</td><td>并发</td><td>&lt;10ms</td><td style="color:var(--safe)">推荐</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========== 7. 调优参数 ========== -->
+  <div class="section-title tuning">
+    核心调优参数
+    <span class="tag">GC 调优速查</span>
+  </div>
+
+  <div class="cards col-1">
+    <div class="card tuning">
+      <div class="params-grid">
+        <div class="param-item"><code>-XX:+PrintGCDetails</code><span class="param-desc">输出 GC 详细日志</span></div>
+        <div class="param-item"><code>-XX:+UseG1GC</code><span class="param-desc">启用 G1 收集器</span></div>
+        <div class="param-item"><code>-XX:+UseParallelGC</code><span class="param-desc">启用 Parallel 收集器</span></div>
+        <div class="param-item"><code>-XX:+UseZGC</code><span class="param-desc">启用 ZGC 收集器</span></div>
+        <div class="param-item"><code>-XX:MaxTenuringThreshold=N</code><span class="param-desc">晋升年龄上限（默认 15）</span></div>
+        <div class="param-item"><code>-XX:MaxGCPauseMillis=N</code><span class="param-desc">G1 目标最大停顿时间（ms）</span></div>
+        <div class="param-item"><code>-XX:G1HeapRegionSize=Nm</code><span class="param-desc">G1 Region 大小（1-32MB）</span></div>
+        <div class="param-item"><code>-XX:TargetSurvivorRatio=N</code><span class="param-desc">Survivor 期望使用率（默认 50%）</span></div>
+        <div class="param-item"><code>-Xms / -Xmx</code><span class="param-desc">堆初始大小 / 最大大小</span></div>
+        <div class="param-item"><code>-Xmn</code><span class="param-desc">新生代大小</span></div>
+        <div class="param-item"><code>-XX:NewRatio=N</code><span class="param-desc">老年代:新生代 比例（默认 2:1）</span></div>
+        <div class="param-item"><code>-XX:+UseAdaptiveSizePolicy</code><span class="param-desc">自适应调节堆大小和晋升阈值</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    JVM 垃圾回收全景图 · 面试知识库 · github.com/turbobo/interview-knowledge-base
+  </div>
+
+</div>
+</body>
+</html>
