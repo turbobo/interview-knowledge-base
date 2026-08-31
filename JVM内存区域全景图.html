@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JVM 内存区域全景图</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #f5f5f0;
+    --card-bg: #ffffff;
+    --text: #1a1a1a;
+    --text-secondary: #666;
+    --private-color: #2d5a3d;
+    --private-bg: #e8f5e9;
+    --private-border: #a5d6a7;
+    --shared-color: #1a3a6b;
+    --shared-bg: #e3f2fd;
+    --shared-border: #90caf9;
+    --external-color: #6d4c00;
+    --external-bg: #fff8e1;
+    --external-border: #ffe082;
+    --danger: #c62828;
+    --safe: #2e7d32;
+    --accent: #d4553a;
+    --radius: 12px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', 'Noto Sans SC', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 40px 24px;
+    line-height: 1.6;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+  .header .subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+  .header .source {
+    font-size: 12px;
+    color: #999;
+    margin-top: 4px;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin-bottom: 36px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+  .legend-dot.private { background: var(--private-color); }
+  .legend-dot.shared { background: var(--shared-color); }
+  .legend-dot.external { background: var(--external-color); }
+
+  /* Section Title */
+  .section-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    padding-left: 12px;
+    border-left: 4px solid;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title.private { border-color: var(--private-color); color: var(--private-color); }
+  .section-title.shared { border-color: var(--shared-color); color: var(--shared-color); }
+  .section-title.external { border-color: var(--external-color); color: var(--external-color); }
+  .section-title .tag {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: #fff;
+  }
+  .section-title .tag.private { background: var(--private-color); }
+  .section-title .tag.shared { background: var(--shared-color); }
+  .section-title .tag.external { background: var(--external-color); }
+
+  /* Cards Grid */
+  .cards {
+    display: grid;
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+  .cards.private { grid-template-columns: repeat(3, 1fr); }
+  .cards.shared { grid-template-columns: repeat(2, 1fr); }
+  .cards.external { grid-template-columns: 1fr; }
+
+  /* Card */
+  .card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    border: 1.5px solid #e0e0e0;
+    padding: 20px;
+    box-shadow: var(--shadow);
+    transition: transform 0.15s, box-shadow 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+  }
+  .card.private::before { background: var(--private-color); }
+  .card.shared::before { background: var(--shared-color); }
+  .card.external::before { background: var(--external-color); }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .card-name {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .card-name-en {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 2px;
+  }
+  .oom-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .oom-badge.safe {
+    background: #e8f5e9;
+    color: var(--safe);
+  }
+  .oom-badge.danger {
+    background: #ffebee;
+    color: var(--danger);
+  }
+
+  .card-body {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+  }
+  .card-body .label {
+    font-weight: 600;
+    color: var(--text);
+    margin-right: 4px;
+  }
+  .card-body .row {
+    margin-bottom: 6px;
+  }
+
+  /* Sub-area (for method area children) */
+  .sub-areas {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .sub-area {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 10px 12px;
+    border-left: 3px solid var(--shared-border);
+  }
+  .sub-area-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--shared-color);
+    margin-bottom: 4px;
+  }
+  .sub-area-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  /* Heap Diagram */
+  .heap-diagram {
+    margin-top: 16px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--shared-border);
+  }
+  .heap-row {
+    display: flex;
+    height: 40px;
+  }
+  .heap-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    border-right: 1px solid rgba(255,255,255,0.3);
+  }
+  .heap-cell:last-child { border-right: none; }
+  .heap-cell.eden { background: #42a5f5; flex: 6; }
+  .heap-cell.s0 { background: #66bb6a; flex: 1; }
+  .heap-cell.s1 { background: #66bb6a; flex: 1; }
+  .heap-cell.old { background: #5c6bc0; flex: 8; }
+  .heap-label {
+    display: flex;
+    font-size: 11px;
+    padding: 4px 0;
+  }
+  .heap-label span {
+    text-align: center;
+    color: var(--text-secondary);
+  }
+  .heap-label .young { flex: 8; }
+  .heap-label .old-l { flex: 8; }
+
+  /* JDK Timeline */
+  .timeline {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    border: 1.5px solid #e0e0e0;
+    padding: 24px;
+    box-shadow: var(--shadow);
+    margin-bottom: 40px;
+  }
+  .timeline h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: var(--shared-color);
+  }
+  .timeline-track {
+    position: relative;
+    padding-left: 24px;
+  }
+  .timeline-track::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e0e0e0;
+  }
+  .timeline-node {
+    position: relative;
+    margin-bottom: 20px;
+    padding-left: 20px;
+  }
+  .timeline-node:last-child { margin-bottom: 0; }
+  .timeline-node::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 6px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid var(--shared-color);
+    background: #fff;
+  }
+  .timeline-node.active::before {
+    background: var(--shared-color);
+  }
+  .timeline-version {
+    font-size: 14px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--shared-color);
+    margin-bottom: 4px;
+  }
+  .timeline-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+  }
+  .timeline-desc code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: #f0f0f0;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--accent);
+  }
+
+  /* OOM Summary Table */
+  .oom-table {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    border: 1.5px solid #e0e0e0;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-bottom: 40px;
+  }
+  .oom-table h3 {
+    font-size: 16px;
+    font-weight: 700;
+    padding: 20px 24px 12px;
+    color: var(--danger);
+  }
+  .oom-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .oom-table th {
+    text-align: left;
+    padding: 10px 16px;
+    background: #fafafa;
+    font-weight: 600;
+    color: var(--text);
+    border-bottom: 1px solid #e0e0e0;
+  }
+  .oom-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    color: var(--text-secondary);
+  }
+  .oom-table tr:last-child td { border-bottom: none; }
+  .oom-table code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: #f5f5f5;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  .oom-yes { color: var(--danger); font-weight: 600; }
+  .oom-no { color: var(--safe); font-weight: 600; }
+
+  /* Stack Frame Detail */
+  .stack-frame {
+    margin-top: 12px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--private-border);
+  }
+  .frame-row {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border-bottom: 1px solid #e8f5e9;
+  }
+  .frame-row:last-child { border-bottom: none; }
+  .frame-row:nth-child(odd) { background: #f1f8e9; }
+  .frame-row:nth-child(even) { background: #fff; }
+  .frame-row .icon {
+    margin-right: 8px;
+    font-size: 14px;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    font-size: 12px;
+    color: #bbb;
+    padding-top: 20px;
+    border-top: 1px solid #e0e0e0;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .cards.private { grid-template-columns: 1fr; }
+    .cards.shared { grid-template-columns: 1fr; }
+    body { padding: 20px 12px; }
+  }
+
+  /* Print */
+  @media print {
+    body { padding: 0; background: #fff; }
+    .card:hover { transform: none; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>JVM 内存区域全景图</h1>
+    <div class="subtitle">Java 虚拟机运行时数据区 — 5 大内存区域 + 直接内存</div>
+    <div class="source">来源：JavaGuide · javaguide.cn/java/jvm/memory-area.html</div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot private"></div>线程私有（随线程生灭）</div>
+    <div class="legend-item"><div class="legend-dot shared"></div>线程共享（VM 启动时创建）</div>
+    <div class="legend-item"><div class="legend-dot external"></div>非 JVM 规范区域</div>
+  </div>
+
+  <!-- ========== 线程私有区域 ========== -->
+  <div class="section-title private">
+    线程私有区域
+    <span class="tag private">随线程创建/销毁</span>
+  </div>
+
+  <div class="cards private">
+    <!-- 程序计数器 -->
+    <div class="card private">
+      <div class="card-header">
+        <div>
+          <div class="card-name">程序计数器</div>
+          <div class="card-name-en">Program Counter</div>
+        </div>
+        <div class="oom-badge safe">不会 OOM</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="label">作用：</span>字节码行号指示器，记录当前执行的指令地址</div>
+        <div class="row"><span class="label">存放：</span>字节码指令地址（native 方法时为 Undefined）</div>
+        <div class="row"><span class="label">用途：</span>线程切换后恢复执行位置、控制流（分支/循环/异常跳转）</div>
+        <div class="row" style="margin-top:8px; color: var(--safe); font-weight: 600; font-size: 12px;">
+          唯一没有规定 OOM 的内存区域
+        </div>
+      </div>
+    </div>
+
+    <!-- 虚拟机栈 -->
+    <div class="card private">
+      <div class="card-header">
+        <div>
+          <div class="card-name">Java 虚拟机栈</div>
+          <div class="card-name-en">JVM Stack</div>
+        </div>
+        <div class="oom-badge danger">会 OOM</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="label">作用：</span>管理 Java 方法执行，每个方法创建一个栈帧</div>
+        <div class="row"><span class="label">溢出：</span>栈深度超限 → <code style="font-family:'JetBrains Mono';font-size:12px;background:#f0f0f0;padding:1px 4px;border-radius:3px;color:#d4553a">StackOverflowError</code></div>
+        <div class="row"><span class="label">OOM：</span>动态扩展时内存不足 → <code style="font-family:'JetBrains Mono';font-size:12px;background:#f0f0f0;padding:1px 4px;border-radius:3px;color:#d4553a">OutOfMemoryError</code></div>
+
+        <div style="margin-top: 8px; font-size: 12px; font-weight: 600; color: var(--private-color);">栈帧结构：</div>
+        <div class="stack-frame">
+          <div class="frame-row"><span class="icon">📦</span> 局部变量表（基本类型 + 对象引用）</div>
+          <div class="frame-row"><span class="icon">📊</span> 操作数栈（计算中间结果）</div>
+          <div class="frame-row"><span class="icon">🔗</span> 动态链接（指向运行时常量池的方法引用）</div>
+          <div class="frame-row"><span class="icon">↩️</span> 方法返回地址</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 本地方法栈 -->
+    <div class="card private">
+      <div class="card-header">
+        <div>
+          <div class="card-name">本地方法栈</div>
+          <div class="card-name-en">Native Method Stack</div>
+        </div>
+        <div class="oom-badge danger">会 OOM</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="label">作用：</span>为 Native 方法（C/C++ 实现）服务</div>
+        <div class="row"><span class="label">HotSpot：</span>与 Java 虚拟机栈合二为一</div>
+        <div class="row"><span class="label">溢出：</span>同虚拟机栈，可抛出 StackOverflowError</div>
+        <div class="row"><span class="label">OOM：</span>动态扩展时内存不足</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 线程共享区域 ========== -->
+  <div class="section-title shared">
+    线程共享区域
+    <span class="tag shared">VM 启动时创建，所有线程共享</span>
+  </div>
+
+  <div class="cards shared">
+    <!-- 堆 -->
+    <div class="card shared">
+      <div class="card-header">
+        <div>
+          <div class="card-name">堆（Heap）</div>
+          <div class="card-name-en">Garbage Collected Heap</div>
+        </div>
+        <div class="oom-badge danger">会 OOM</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="label">作用：</span>GC 主战场，存放几乎所有对象实例和数组</div>
+        <div class="row"><span class="label">OOM：</span><code style="font-family:'JetBrains Mono';font-size:12px;background:#f0f0f0;padding:1px 4px;border-radius:3px;color:#d4553a">Java heap space</code> 或 <code style="font-family:'JetBrains Mono';font-size:12px;background:#f0f0f0;padding:1px 4px;border-radius:3px;color:#d4553a">GC Overhead Limit Exceeded</code></div>
+
+        <div style="margin-top: 12px; font-size: 12px; font-weight: 600; color: var(--shared-color);">堆内存分代结构：</div>
+        <div class="heap-diagram">
+          <div class="heap-label">
+            <span class="young">← 新生代（Young Generation）→</span>
+            <span class="old-l">← 老年代（Old Generation）→</span>
+          </div>
+          <div class="heap-row">
+            <div class="heap-cell eden">Eden 区（~80%）</div>
+            <div class="heap-cell s0">S0</div>
+            <div class="heap-cell s1">S1</div>
+            <div class="heap-cell old">Old Gen</div>
+          </div>
+          <div class="heap-label">
+            <span class="young" style="font-size:10px; color:#999">新对象在此分配，Minor GC 频繁回收</span>
+            <span class="old-l" style="font-size:10px; color:#999">长存活对象，Major/Full GC</span>
+          </div>
+        </div>
+
+        <div style="margin-top: 8px; font-size: 12px; color: var(--text-secondary);">
+          <span class="label">比例：</span>Eden : S0 : S1 = 8 : 1 : 1（默认）<br>
+          <span class="label">晋升：</span>对象年龄达到阈值（默认 15）或 Survivor 空间不足时晋升老年代
+        </div>
+      </div>
+    </div>
+
+    <!-- 方法区 -->
+    <div class="card shared">
+      <div class="card-header">
+        <div>
+          <div class="card-name">方法区（Method Area）</div>
+          <div class="card-name-en">Method Area / Metaspace</div>
+        </div>
+        <div class="oom-badge danger">会 OOM</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="label">作用：</span>存储类元数据、方法字节码、常量池</div>
+        <div class="row"><span class="label">OOM：</span><code style="font-family:'JetBrains Mono';font-size:12px;background:#f0f0f0;padding:1px 4px;border-radius:3px;color:#d4553a">java.lang.OutOfMemoryError: Metaspace</code></div>
+
+        <div class="sub-areas">
+          <div class="sub-area">
+            <div class="sub-area-name">运行时常量池（Runtime Constant Pool）</div>
+            <div class="sub-area-desc">编译期生成的字面量和符号引用。受方法区容量限制，可触发 OOM。</div>
+          </div>
+          <div class="sub-area">
+            <div class="sub-area-name">字符串常量池（String Pool）</div>
+            <div class="sub-area-desc">JDK 1.7 起从永久代移至 Java 堆中，便于 GC 回收。通过 <code style="font-family:'JetBrains Mono';font-size:11px;background:#f0f0f0;padding:1px 3px;border-radius:2px">String.intern()</code> 复用字符串。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== JDK 版本演进 ========== -->
+  <div class="timeline">
+    <h3>方法区实现演进（JDK 版本变化）</h3>
+    <div class="timeline-track">
+      <div class="timeline-node">
+        <div class="timeline-version">JDK 1.7 及更早</div>
+        <div class="timeline-desc">
+          实现为 <strong>永久代（PermGen）</strong>，使用 JVM 管理的堆内存。<br>
+          通过 <code>-XX:MaxPermSize</code> 设置上限（默认约 82MB）。<br>
+          静态变量和字符串常量池也在此区域。
+        </div>
+      </div>
+      <div class="timeline-node">
+        <div class="timeline-version">JDK 1.7（过渡）</div>
+        <div class="timeline-desc">
+          字符串常量池和静态变量 <strong>移至 Java 堆</strong>。<br>
+          永久代仍然存在，但内容减少。
+        </div>
+      </div>
+      <div class="timeline-node active">
+        <div class="timeline-version">JDK 1.8+</div>
+        <div class="timeline-desc">
+          永久代被 <strong>元空间（Metaspace）</strong> 完全替代。<br>
+          使用 <strong>本地内存（Native Memory）</strong>，不再受 JVM 堆大小限制。<br>
+          通过 <code>-XX:MaxMetaspaceSize</code> 设置上限（默认无上限）。<br>
+          <span style="font-size:12px; color: var(--text-secondary);">变更原因：永久代容量受限、GC 效率低、HotSpot 与 JRockit 合并（JRockit 无 PermGen）</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 非 JVM 规范区域 ========== -->
+  <div class="section-title external">
+    非 JVM 规范区域
+    <span class="tag external">不属于运行时数据区，但常用</span>
+  </div>
+
+  <div class="cards external">
+    <div class="card external">
+      <div class="card-header">
+        <div>
+          <div class="card-name">直接内存（Direct Memory）</div>
+          <div class="card-name-en">Off-Heap Memory / Direct Buffer</div>
+        </div>
+        <div class="oom-badge danger">会 OOM</div>
+      </div>
+      <div class="card-body">
+        <div class="row"><span class="label">来源：</span>JDK 1.4 NIO 引入，通过 <code style="font-family:'JetBrains Mono';font-size:12px;background:#f0f0f0;padding:1px 4px;border-radius:3px">DirectByteBuffer</code> 在堆外分配内存</div>
+        <div class="row"><span class="label">作用：</span>减少 I/O 场景下 JVM 堆与 Native 内存之间的数据拷贝，提升性能</div>
+        <div class="row"><span class="label">限制：</span>受物理内存和 <code style="font-family:'JetBrains Mono';font-size:12px;background:#f0f0f0;padding:1px 4px;border-radius:3px">-XX:MaxDirectMemorySize</code> 参数限制</div>
+        <div class="row"><span class="label">场景：</span>NIO 文件读写、Netty、高性能缓存</div>
+        <div class="row"><span class="label">注意：</span>不受 GC 直接管理，通过 <code style="font-family:'JetBrains Mono';font-size:12px;background:#f0f0f0;padding:1px 4px;border-radius:3px">System.gc()</code> 或 <code style="font-family:'JetBrains Mono';font-size:12px;background:#f0f0f0;padding:1px 4px;border-radius:3px">Cleaner</code> 释放</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== OOM 速查表 ========== -->
+  <div class="oom-table">
+    <h3>OOM 速查表</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>内存区域</th>
+          <th>线程属性</th>
+          <th>可能 OOM</th>
+          <th>常见错误信息</th>
+          <th>常见原因</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>程序计数器</strong></td>
+          <td>私有</td>
+          <td class="oom-no">不会</td>
+          <td>—</td>
+          <td>唯一不会 OOM 的区域</td>
+        </tr>
+        <tr>
+          <td><strong>虚拟机栈</strong></td>
+          <td>私有</td>
+          <td class="oom-yes">会</td>
+          <td><code>StackOverflowError</code><br><code>OutOfMemoryError</code></td>
+          <td>递归过深、栈帧过大</td>
+        </tr>
+        <tr>
+          <td><strong>本地方法栈</strong></td>
+          <td>私有</td>
+          <td class="oom-yes">会</td>
+          <td><code>StackOverflowError</code><br><code>OutOfMemoryError</code></td>
+          <td>同虚拟机栈</td>
+        </tr>
+        <tr>
+          <td><strong>堆</strong></td>
+          <td>共享</td>
+          <td class="oom-yes">会</td>
+          <td><code>Java heap space</code><br><code>GC Overhead Limit Exceeded</code></td>
+          <td>对象过多、内存泄漏</td>
+        </tr>
+        <tr>
+          <td><strong>方法区</strong></td>
+          <td>共享</td>
+          <td class="oom-yes">会</td>
+          <td><code>OutOfMemoryError: Metaspace</code></td>
+          <td>类加载过多、动态代理大量生成类</td>
+        </tr>
+        <tr>
+          <td><strong>直接内存</strong></td>
+          <td>—</td>
+          <td class="oom-yes">会</td>
+          <td><code>OutOfMemoryError: Direct buffer memory</code></td>
+          <td>NIO DirectBuffer 分配过多</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    JVM 内存区域全景图 · 面试知识库 · github.com/turbobo/interview-knowledge-base
+  </div>
+
+</div>
+</body>
+</html>
