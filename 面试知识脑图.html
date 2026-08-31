@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>面试知识库 · 知识脑图</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #f5f5f0;
+    --card-bg: #ffffff;
+    --text: #1a1a1a;
+    --text-secondary: #666;
+    --accent: #d4553a;
+    --java-color: #e76f00;
+    --agent-color: #6a1b9a;
+    --radius: 12px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', 'Noto Sans SC', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 40px 24px;
+    line-height: 1.6;
+  }
+
+  .container { max-width: 1400px; margin: 0 auto; }
+
+  .header { text-align: center; margin-bottom: 36px; }
+  .header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px; }
+  .header .subtitle { font-size: 14px; color: var(--text-secondary); }
+
+  /* Tabs */
+  .tabs {
+    display: flex; justify-content: center; gap: 8px; margin-bottom: 24px;
+  }
+  .tab {
+    padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 600;
+    cursor: pointer; border: 2px solid #e0e0e0; background: #fff;
+    transition: all 0.15s; user-select: none;
+  }
+  .tab:hover { border-color: #bbb; }
+  .tab.active-java { border-color: var(--java-color); color: var(--java-color); background: #fff8f0; }
+  .tab.active-agent { border-color: var(--agent-color); color: var(--agent-color); background: #f8f0ff; }
+
+  /* Mindmap container */
+  .mindmap-section { display: none; }
+  .mindmap-section.active { display: block; }
+
+  .mindmap-card {
+    background: var(--card-bg); border-radius: var(--radius);
+    border: 1.5px solid #e0e0e0; padding: 32px;
+    box-shadow: var(--shadow); overflow-x: auto;
+  }
+
+  .mindmap-card .mermaid {
+    display: flex; justify-content: center;
+    min-height: 600px;
+  }
+
+  .section-title {
+    font-size: 16px; font-weight: 700; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+  .section-title .dot.java { background: var(--java-color); }
+  .section-title .dot.agent { background: var(--agent-color); }
+
+  /* Quick nav */
+  .quick-nav {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px; margin-bottom: 20px;
+  }
+  .nav-item {
+    padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;
+    text-align: center; border: 1px solid #e8e8e8; background: #fafafa;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .nav-item:hover { background: #f0f0f0; }
+  .nav-item.java:hover { border-color: var(--java-color); color: var(--java-color); }
+  .nav-item.agent:hover { border-color: var(--agent-color); color: var(--agent-color); }
+
+  .footer {
+    text-align: center; font-size: 12px; color: #bbb;
+    padding-top: 20px; border-top: 1px solid #e0e0e0; margin-top: 32px;
+  }
+
+  @media (max-width: 768px) {
+    body { padding: 20px 12px; }
+    .mindmap-card { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>面试知识库 · 知识脑图</h1>
+    <div class="subtitle">Mermaid Mindmap — 切换标签页查看不同主题的思维导图</div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active-java" id="tab-java" onclick="switchTab('java')">☕ Java 面试脑图</div>
+    <div class="tab" id="tab-agent" onclick="switchTab('agent')">🤖 AI Agent 脑图</div>
+  </div>
+
+  <!-- Java Mindmap -->
+  <div class="mindmap-section active" id="section-java">
+    <div class="section-title"><div class="dot java"></div>Java 面试知识体系（11 大模块 · 100+ 高频题）</div>
+    <div class="quick-nav">
+      <div class="nav-item java">Java 基础</div>
+      <div class="nav-item java">集合框架</div>
+      <div class="nav-item java">并发编程</div>
+      <div class="nav-item java">JVM</div>
+      <div class="nav-item java">Spring</div>
+      <div class="nav-item java">MySQL</div>
+      <div class="nav-item java">Redis</div>
+      <div class="nav-item java">分布式</div>
+      <div class="nav-item java">消息队列</div>
+      <div class="nav-item java">系统设计</div>
+      <div class="nav-item java">软技能</div>
+    </div>
+    <div class="mindmap-card">
+      <div class="mermaid">
+mindmap
+  root((Java 面试<br/>知识体系))
+    Java 基础
+      值传递与引用传递
+      String / StringBuilder / StringBuffer
+      equals 与 hashCode
+      8 种基本数据类型
+      接口 vs 抽象类
+      深拷贝 vs 浅拷贝
+      反射与动态代理
+      异常体系
+    集合框架
+      ArrayList vs LinkedList
+      HashMap 原理
+        数组+链表+红黑树
+        扩容机制 2倍
+        线程不安全原因
+      ConcurrentHashMap
+        JDK7 分段锁
+        JDK8 CAS+synchronized
+      TreeMap / HashSet
+      线程安全 List
+    并发编程
+      线程 6 种状态
+      synchronized vs ReentrantLock
+      volatile 可见性+有序性
+      JMM 内存模型
+      CAS 与 ABA 问题
+      AQS 核心框架
+      线程池 7 大参数
+      CountDownLatch / CyclicBarrier
+      ThreadLocal 内存泄漏
+      死锁 4 条件
+      CompletableFuture
+      虚拟线程 Virtual Thread
+    JVM
+      内存区域
+        程序计数器
+        虚拟机栈
+        本地方法栈
+        堆 Eden+S0+S1+Old
+        方法区 Metaspace
+        直接内存
+      垃圾回收
+        可达性分析 GC Roots
+        四种引用
+        回收算法
+        收集器演进
+        Minor/Major/Full GC
+      类加载 双亲委派
+      调优参数
+    Spring
+      IOC 控制反转
+      AOP 动态代理
+      Bean 生命周期
+      三级缓存循环依赖
+      Transactional 失效
+      Boot 自动装配
+      MVC 请求流程
+      事务传播与隔离
+    MySQL
+      B+树索引
+      聚簇 vs 非聚簇
+      索引失效场景
+      ACID 特性
+      隔离级别与 MVCC
+      慢查询优化
+      分库分表
+      主从复制
+      死锁排查
+    Redis
+      单线程为什么快
+      5+3 数据类型
+      RDB / AOF 持久化
+      主从 / 哨兵 / Cluster
+      穿透 / 击穿 / 雪崩
+      缓存一致性
+      大 key 问题
+      内存淘汰策略
+    分布式
+      CAP / BASE
+      分布式事务 2PC/TCC/Saga
+      分布式 ID 雪花算法
+      分布式锁 Redis/ZK
+      一致性 Hash
+      微服务
+      熔断降级限流
+      RPC 框架
+    消息队列
+      异步/解耦/削峰
+      Kafka vs RocketMQ vs RabbitMQ
+      消息顺序性
+      重复消费与幂等
+      消息积压
+      可靠投递
+    系统设计
+      秒杀系统
+      短链系统
+      Feed 流
+      排行榜
+      分布式限流
+      </div>
+    </div>
+  </div>
+
+  <!-- Agent Mindmap -->
+  <div class="mindmap-section" id="section-agent">
+    <div class="section-title"><div class="dot agent"></div>AI Agent / LLM Agent 知识体系</div>
+    <div class="quick-nav">
+      <div class="nav-item agent">概念定义</div>
+      <div class="nav-item agent">核心组件</div>
+      <div class="nav-item agent">工作原理</div>
+      <div class="nav-item agent">设计模式</div>
+      <div class="nav-item agent">关键技术</div>
+      <div class="nav-item agent">应用场景</div>
+      <div class="nav-item agent">面试高频题</div>
+    </div>
+    <div class="mindmap-card">
+      <div class="mermaid">
+mindmap
+  root((AI Agent<br/>知识体系))
+    概念定义
+      LLM 大语言模型
+        文本生成与理解
+        局限: 无法执行操作
+        局限: 缺乏跨会话记忆
+      Agent 智能体
+        LLM 在循环中使用工具
+        从顾问变为项目经理
+      Workflow 工作流
+        代码固化流程
+        vs Agent 动态决策
+    核心组件
+      大脑 LLM
+      规划模块
+      记忆模块
+        短期记忆
+        长期记忆
+      工具模块
+        API 调用
+        数据库
+        搜索引擎
+    工作原理
+      自然语言 转 结构化操作
+      意图分析
+      工具选择
+      参数提取
+      函数执行
+      结果整合
+      循环迭代
+    设计模式
+      ReAct 推理+行动
+        思考-行动-观察
+        高透明度
+        Token消耗大
+      Plan-and-Execute
+        先规划再执行
+        降低推理成本
+      Reflection 反思
+        自我审查
+        交叉评审
+      Multi-Agent
+        专业化角色协作
+    关键技术
+      Function Call
+        何时调用
+        提取参数
+      MCP 协议
+        AI界USB-C
+        NxM 转 N+M
+        工具动态发现
+      Skills 技能
+        Markdown 指令
+        领域知识注入
+      A2A 协议
+        Agent Card
+        Task 生命周期
+        Artifact 制品
+    应用场景
+      混合架构客服
+      跨部门协同
+      专业领域工程化
+      开放式复杂任务
+    面试高频题
+      Agent vs Workflow
+      ReAct vs Plan-Execute
+      MCP 解决什么
+      避免死循环
+      Multi-Agent 适用场景
+      Function Call vs MCP
+      Skills vs Prompt
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    面试知识库 · 知识脑图 · github.com/turbobo/interview-knowledge-base
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'neutral',
+    mindmap: {
+      padding: 16,
+      useMaxWidth: true
+    },
+    securityLevel: 'loose'
+  });
+
+  function switchTab(tab) {
+    // Update tabs
+    document.getElementById('tab-java').className = tab === 'java' ? 'tab active-java' : 'tab';
+    document.getElementById('tab-agent').className = tab === 'agent' ? 'tab active-agent' : 'tab';
+
+    // Update sections
+    document.getElementById('section-java').className = tab === 'java' ? 'mindmap-section active' : 'mindmap-section';
+    document.getElementById('section-agent').className = tab === 'agent' ? 'mindmap-section active' : 'mindmap-section';
+  }
+</script>
+</body>
+</html>
