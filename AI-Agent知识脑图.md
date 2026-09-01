@@ -1,3 +1,10 @@
+# AI Agent 面试知识脑图
+
+> LLM Agent 概念、核心组件、设计模式、关键技术点全覆盖
+
+## AI Agent 知识体系总览
+
+```mermaid
 mindmap
   root((AI Agent<br/>知识体系))
     概念定义
@@ -28,11 +35,13 @@ mindmap
         数据库交互
         搜索引擎
     工作原理
-      自然语言 → 结构化操作
-      意图分析 → 工具选择
-      参数提取 → 函数执行
-      结果整合 → 自然语言回复
-      循环迭代 思考-行动-观察
+      自然语言转结构化操作
+      意图分析
+      工具选择
+      参数提取
+      函数执行
+      结果整合
+      循环迭代
     设计模式
       ReAct 推理+行动
         思考-行动-观察循环
@@ -57,7 +66,7 @@ mindmap
       MCP 模型上下文协议
         AI界USB-C接口
         Host/Client/Server
-        NxM → N+M
+        NxM 转 N+M
         工具动态发现
       Skills 技能
         Markdown 指令文件
@@ -83,10 +92,67 @@ mindmap
         竞品分析报告
         自动化差旅规划
     面试高频题
-      Agent vs Workflow
-      ReAct vs Plan-Execute
-      MCP 解决什么
-      避免死循环
+      Agent vs Workflow 区别
+      ReAct vs Plan-Execute 选择
+      MCP 解决什么问题
+      如何避免死循环
       Multi-Agent 适用场景
       Function Call vs MCP
-      Skills vs Prompt
+      Skills vs Prompt 区别
+```
+
+## 四大设计模式对比
+
+```mermaid
+mindmap
+  root((设计模式对比))
+    ReAct
+      边想边做
+      思考-行动-观察
+      透明度高
+      Token 消耗大
+      适合探索性任务
+    Plan-and-Execute
+      先规划后执行
+      全局计划
+      推理成本低
+      灵活性弱
+      适合步骤明确任务
+    Reflection
+      任务后审查
+      自我检查
+      双智能体交叉评审
+      提升质量
+      适合代码/文档
+    Multi-Agent
+      多角色协作
+      专业化分工
+      系统复杂度高
+      协调成本
+      避免过早引入
+```
+
+## 关键技术栈关系
+
+```mermaid
+mindmap
+  root((Agent 技术栈))
+    基础层
+      LLM 大语言模型
+      Function Call 函数调用
+    协议层
+      MCP 工具接入
+        标准化连接
+        动态发现
+      A2A 智能体通信
+        Agent Card
+        Task 管理
+    知识层
+      Skills 技能文件
+      长期记忆
+      领域知识
+    应用层
+      单 Agent 系统
+      Multi-Agent 协作
+      Workflow + Agent 混合
+```
