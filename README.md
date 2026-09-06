@@ -12,6 +12,7 @@
 | [JVM 内存区域全景图](./JVM内存区域全景图.html) | 可视化知识图（浏览器打开），含堆分代图、时间线、OOM 速查表 | 中级 / 高级 |
 | [JVM 垃圾回收](./JVM垃圾回收.md) | 可达性分析、回收算法、收集器演进（Serial→G1→ZGC）、调优参数 | 中级 / 高级 |
 | [JVM 垃圾回收全景图](./JVM垃圾回收全景图.html) | 可视化知识图（浏览器打开），含 GC Roots、四种引用、收集器对比、调优参数 | 中级 / 高级 |
+| [JVM 栈与堆：引用 vs 对象](./JVM栈与堆-引用vs对象.md) | 栈存引用/堆存对象、内存布局图、引用实现方式、String 存储位置 | 初级 / 中级 |
 | [面试知识脑图](./面试知识脑图.html) | Mermaid 思维导图（浏览器打开），Java 面试 + AI Agent 两大主题，可切换标签页 | 全难度 |
 | [Java 面试脑图](./Java面试知识脑图.md) | 含 3 张 Mermaid 脑图：Java 知识体系 + JVM 内存区域 + JVM 垃圾回收（[钉钉文档](https://alidocs.dingtalk.com/i/nodes/R1zknDm0WR6XzZ4LtzmZNjMdWBQEx5rG)） | 全难度 |
 | [AI Agent 脑图](./AI-Agent知识脑图.md) | 含 4 张 Mermaid 脑图：Agent 知识体系 + 设计模式对比 + 技术栈关系（[钉钉文档](https://alidocs.dingtalk.com/i/nodes/EpGBa2Lm8aZxe5myCz69NZXaWgN7R35y)） | 中级 / 高级 |
