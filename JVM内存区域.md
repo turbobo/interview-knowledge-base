@@ -152,7 +152,29 @@ String s3 = s2.intern();         // 返回常量池中的引用
 
 **新生代（Young Generation）**
 
-新创建的对象优先分配在 Eden 区（Eden : S0 : S1 = 8 : 1 : 1）。当 Eden 空间不足时触发 **Minor GC**，存活对象被复制到两个 Survivor 区（from / to，大小相等）。每次 Minor GC 后，from 和 to 角色互换。对象在 Survivor 区每经历一次 GC 年龄 +1，达到阈值后晋升到老年代。
+新创建的对象优先分配在 Eden 区（Eden : S0 : S1 = 8 : 1 : 1，通过 `-XX:SurvivorRatio` 控制）。
+
+**S0 / S1（Survivor 区）的作用：**
+
+S0 和 S1 是两个大小相等的 Survivor 区（也叫 From / To），核心作用是**在 Minor GC 之间保留存活对象**，同时让复制算法能高效回收且**不产生内存碎片**。
+
+Minor GC 发生时，JVM 把 Eden + From 中所有存活对象复制到 To 区，然后清空 Eden 和 From。复制完成后 From 和 To 角色互换——原来的 To 变成下次的 From，原来的 From 变成下次的 To。
+
+```
+第 1 次 Minor GC 前：Eden(新对象)  | S0(From, 有存活) | S1(To, 空)
+第 1 次 Minor GC 后：Eden(空)      | S0(空→变 To)     | S1(From, 存活)
+
+第 2 次 Minor GC 前：Eden(新对象)  | S0(To, 空)       | S1(From, 有存活)
+第 2 次 Minor GC 后：Eden(空)      | S0(From, 存活)   | S1(空→变 To)
+```
+
+**为什么需要两个 Survivor 而不是一个？** 复制算法需要两块空间来回倒腾。如果只有一个 Survivor，Eden 复制过来的存活对象会和 Survivor 原有对象混在一起，产生碎片，失去复制算法"无碎片"的优势。
+
+**对象何时离开 Survivor 区？**
+
+- **年龄达标晋升**：对象每经历一次 GC 年龄 +1，达到 `-XX:MaxTenuringThreshold`（默认 15）时晋升老年代
+- **Survivor 放不下**：To 区空间不足时，剩余对象直接进老年代
+- **动态年龄**：Survivor 区同年龄对象总大小超过 Survivor 空间一半时，≥ 该年龄的对象直接晋升
 
 **老年代（Old Generation / Tenured Generation）**
 
