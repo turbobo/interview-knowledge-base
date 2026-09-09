@@ -15,6 +15,7 @@
 | [面试知识脑图](./面试知识脑图.html) | Mermaid 思维导图（浏览器打开），Java 面试 + AI Agent 两大主题，可切换标签页 | 全难度 |
 | [Java 面试脑图](./Java面试知识脑图.md) | 含 3 张 Mermaid 脑图：Java 知识体系 + JVM 内存区域 + JVM 垃圾回收（[钉钉文档](https://alidocs.dingtalk.com/i/nodes/R1zknDm0WR6XzZ4LtzmZNjMdWBQEx5rG)） | 全难度 |
 | [AI Agent 脑图](./AI-Agent知识脑图.md) | 含 4 张 Mermaid 脑图：Agent 知识体系 + 设计模式对比 + 技术栈关系（[钉钉文档](https://alidocs.dingtalk.com/i/nodes/EpGBa2Lm8aZxe5myCz69NZXaWgN7R35y)） | 中级 / 高级 |
+| [系统设计专题](./系统设计专题.md) | 秒杀系统、短链系统、Feed 流、分布式 ID、排行榜、分布式限流 + 面试方法论 | 高级 |
 
 ## 可视化图示索引
 
@@ -32,7 +33,7 @@
 - [x] JVM 垃圾回收知识图
 - [x] Java 面试 + AI Agent 思维导图
 - [ ] Spring Boot 微服务面试题
-- [ ] 系统设计专题（秒杀、短链、Feed 流）
+- [x] 系统设计专题（秒杀、短链、Feed 流、分布式 ID、排行榜、限流）
 - [ ] 算法题解（LeetCode 高频）
 - [ ] 项目经历 STAR 模板
 
