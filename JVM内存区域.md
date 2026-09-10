@@ -588,6 +588,60 @@ java.lang.OutOfMemoryError: Java heap space
 | **元空间超限** | 类加载过多，超出 MaxMetaspaceSize | `Metaspace` |
 | **直接内存不足** | NIO DirectByteBuffer 分配过多 | `Direct buffer memory` |
 
+### 报错表象
+
+**内存泄漏的报错表象：**
+
+泄漏本身**不会立即报错**，程序继续运行，但会出现以下渐进症状：
+
+| 阶段 | 表现 |
+|------|------|
+| 初期 | 无明显异常，内存缓慢增长 |
+| 中期 | GC 频率增加，`jstat -gcutil` 看到 Old 区持续上升 |
+| 后期 | Full GC 频繁，STW 停顿变长，接口响应变慢 |
+| 最终 | 触发 OOM（见下表） |
+
+**内存溢出的报错表象：**
+
+不同内存区域耗尽时，错误信息不同：
+
+| 错误信息 | 触发区域 | 典型场景 |
+|----------|----------|----------|
+| `java.lang.OutOfMemoryError: Java heap space` | 堆 | 大对象/集合膨胀、泄漏积累 |
+| `java.lang.OutOfMemoryError: Metaspace` | 元空间 | 类加载过多、动态代理 |
+| `java.lang.OutOfMemoryError: Direct buffer memory` | 直接内存 | NIO/Netty 大量 DirectByteBuffer |
+| `java.lang.OutOfMemoryError: unable to create new native thread` | 线程栈 | 线程数过多，操作系统限制 |
+| `java.lang.OutOfMemoryError: GC overhead limit exceeded` | 堆 | GC 花了 98% 时间只回收了 2% 内存 |
+| `java.lang.OutOfMemoryError: Requested array size exceeds VM limit` | 堆 | 数组大小超过 JVM 限制（约 Integer.MAX_VALUE - 8） |
+| `java.lang.StackOverflowError` | 虚拟机栈 | 深度递归（**不是 OOM**，是 StackOverflow） |
+
+**关键区分：**
+
+```
+泄漏 → 无症状 → 慢 → GC 频繁 → 最终 OOM（有异常栈）
+溢出 → 直接崩溃（有异常栈）
+StackOverflow → 直接崩溃（有异常栈，但不是 OOM）
+```
+
+**实际日志示例：**
+
+```java
+// 堆溢出
+Exception in thread "main" java.lang.OutOfMemoryError: Java heap space
+    at java.util.Arrays.copyOf(Arrays.java:3236)
+    at java.util.ArrayList.grow(ArrayList.java:265)
+
+// 元空间溢出
+Exception in thread "main" java.lang.OutOfMemoryError: Metaspace
+
+// 线程创建失败
+Exception in thread "main" java.lang.OutOfMemoryError: unable to create new native thread
+    at java.lang.Thread.start0(Native Method)
+
+// GC 开销过大
+Exception in thread "main" java.lang.OutOfMemoryError: GC overhead limit exceeded
+```
+
 > **注意**：深度递归触发的是 `StackOverflowError`，不属于 OOM，二者是不同的 Error。
 
 ### 排查手段
