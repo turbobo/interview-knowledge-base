@@ -343,3 +343,83 @@ Java 8 起，永久代（PermGen）被元空间替代。元空间存储类元数
 
 **Q4：什么情况下会触发 Full GC？**
 > ① 老年代空间不足；② 方法区空间不足；③ 显式调用 `System.gc()`（建议而非强制）；④ CMS concurrent mode failure。
+
+---
+
+## 六、JVM 本地内存（Native Memory）
+
+JVM 本地内存是指 JVM 进程在操作系统上申请的、**不属于 Java 堆**的那部分内存。它由 JVM 自身和操作系统共同管理，**不受 GC 直接回收**。
+
+> 面试中"本地内存"和"堆外内存"经常混用，但严格来说：本地内存是操作系统视角的概念（JVM 进程占用的所有非堆内存），堆外内存是 Java 视角的概念（不在 Java 堆里的内存）。两者高度重叠。
+
+**本地内存的组成：**
+
+```
+┌──────────────────── JVM 进程内存（RSS）────────────────────┐
+│                                                            │
+│  ┌──────────────── Java 堆 ────────────────┐               │
+│  │  Eden + S0 + S1 + Old（GC 管理）         │               │
+│  └──────────────────────────────────────────┘               │
+│                                                            │
+│  ┌──────────────── 本地内存 ────────────────┐               │
+│  │                                          │               │
+│  │  ① Metaspace（元空间）                    │               │
+│  │     类元数据、常量池、方法信息              │               │
+│  │     -XX:MaxMetaspaceSize（默认不限）       │               │
+│  │                                          │               │
+│  │  ② 线程栈（每个线程一份）                  │               │
+│  │     默认 1MB/线程，-Xss 调整               │               │
+│  │     1000 线程 ≈ 1GB                      │               │
+│  │                                          │               │
+│  │  ③ Code Cache（JIT 编译产物）              │               │
+│  │     -XX:ReservedCodeCacheSize             │               │
+│  │                                          │               │
+│  │  ④ Direct Memory（直接内存）               │               │
+│  │     NIO DirectByteBuffer                  │               │
+│  │     -XX:MaxDirectMemorySize               │               │
+│  │                                          │               │
+│  │  ⑤ JVM 自身开销                           │               │
+│  │     GC 数据结构、类加载器、符号表            │               │
+│  │                                          │               │
+│  └──────────────────────────────────────────┘               │
+└────────────────────────────────────────────────────────────┘
+```
+
+**各部分详解：**
+
+| 组成 | 说明 | 关键参数 |
+|------|------|----------|
+| **Metaspace（元空间）** | 存放类元数据、常量池、方法信息。JDK8 取代永久代，使用本地内存 | `-XX:MaxMetaspaceSize`（默认不限） |
+| **线程栈** | 每个 Java 线程独立的 native 栈，存放栈帧、局部变量表。线程数多时占用很大 | `-Xss`（默认 1MB） |
+| **Code Cache** | JIT 编译器将热点代码编译为机器码后存储在这里 | `-XX:ReservedCodeCacheSize` |
+| **Direct Memory** | NIO 的 `DirectByteBuffer` 在堆外分配，读写时避免堆内外拷贝，适合 IO 密集场景 | `-XX:MaxDirectMemorySize` |
+| **JVM 自身开销** | GC 数据结构（如 Card Table）、类加载器元数据、符号表、JIT 编译器内部结构 | — |
+
+**为什么本地内存泄漏不容易发现？**
+
+Java 堆有 GC 自动回收，而本地内存需要手动释放或依赖 JVM 内部机制（如 `Cleaner`）。本地内存泄漏不会触发常规 GC，只会在物理内存耗尽时被操作系统 OOM Killer 杀掉，表现为进程突然消失，没有 Java 异常栈。
+
+**排查本地内存的常用工具：**
+
+| 工具 | 用途 | 示例 |
+|------|------|------|
+| **NMT（Native Memory Tracking）** | JVM 内置，按类别统计本地内存 | `-XX:NativeMemoryTracking=detail` + `jcmd <pid> VM.native_memory summary` |
+| **pmap** | 操作系统级，查看进程内存映射分布 | `pmap -x <pid>` |
+| **jemalloc** | 第三方内存分配器，带 profiling 报告 | `MALLOC_CONF=prof:true` 启动后生成 `.heap` 文件 |
+| **jcmd** | 查看 GC 堆外内存概览 | `jcmd <pid> GC.heap_info` |
+
+**NMT 输出示例（关键行）：**
+
+```
+Total: reserved=2147483648, committed=524288000
+-                 Java Heap: reserved=1073741824, committed=268435456
+-                     Non-Class: reserved=268435456, committed=134217728
+-                       Class: reserved=134217728, committed=67108864   ← Metaspace
+-                    Thread: reserved=104857600, committed=104857600   ← 线程栈（100线程×1MB）
+-                      Code: reserved=251658240, committed=8388608     ← Code Cache
+-                        GC: reserved=16777216, committed=4194304
+-                 Internal: reserved=4194304, committed=2097152
+-                    Symbol: reserved=8388608, committed=4194304
+```
+
+> **面试回答建议**：JVM 本地内存主要包括 Metaspace（类元数据）、线程栈（每线程 1MB）、Code Cache（JIT 产物）、Direct Memory（NIO 堆外缓冲）和 JVM 自身开销。排查用 NMT（`jcmd VM.native_memory`）或操作系统工具 `pmap`。本地内存泄漏比堆内存更隐蔽，因为不受 GC 管理。
