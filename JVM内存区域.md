@@ -454,3 +454,84 @@ Total: reserved=2147483648, committed=524288000
 ```
 
 > **面试回答建议**：JVM 本地内存主要包括 Metaspace（类元数据）、线程栈（每线程 1MB）、Code Cache（JIT 产物）、Direct Memory（NIO 堆外缓冲）和 JVM 自身开销。排查用 NMT（`jcmd VM.native_memory`）或操作系统工具 `pmap`。本地内存泄漏比堆内存更隐蔽，因为不受 GC 管理。
+
+---
+
+## 七、Java 四种引用
+
+Java 通过引用类型控制对象的生命周期和 GC 行为。从 JDK 1.2 起，引用分为四种强度：**强引用 > 软引用 > 弱引用 > 虚引用**。
+
+**四种引用对比：**
+
+| 引用类型 | 类 | GC 行为 | 典型用途 |
+|----------|-----|---------|----------|
+| **强引用** | 直接赋值 `Object obj = new Object()` | **不会被回收**，即使 OOM 也不回收 | 普通对象引用 |
+| **软引用** | `SoftReference<T>` | 内存不足时回收 | 内存敏感的缓存（图片缓存、浏览器缓存） |
+| **弱引用** | `WeakReference<T>` | **下次 GC 时一定回收**（无论内存是否充足） | 弱哈希表（WeakHashMap）、避免内存泄漏 |
+| **虚引用** | `PhantomReference<T>` | 随时可能回收，`get()` 永远返回 null | 跟踪对象被 GC 的时机，配合 ReferenceQueue 使用 |
+
+**引用强度与回收时机：**
+
+```
+强引用 ─→ 永不回收（OOM 也不回收）
+  ↓
+软引用 ──→ 内存不足时回收
+  ↓
+弱引用 ─→ 下次 GC 时一定回收
+  ↓
+虚引用 ──→ 随时可能回收，无法通过 get() 获取对象
+```
+
+### 弱引用详解
+
+弱引用通过 `java.lang.ref.WeakReference` 类实现。它不会阻止对象被垃圾回收，主要用途是创建非强制性的对象引用，在内存压力大时被 GC 清理，从而避免内存泄漏。
+
+**使用场景：**
+
+- **缓存系统**：弱引用常用于实现缓存，特别是当希望缓存项能够在内存压力下自动释放时。如果缓存的大小不受控制，可能会导致内存溢出。使用弱引用来维护缓存，可以让 JVM 在需要更多内存时自动清理这些缓存对象。
+- **对象池**：在对象池中，弱引用可以用来管理那些暂时不使用的对象。当对象不再被强引用时，它们可以被垃圾回收，释放内存。
+- **避免内存泄漏**：当一个对象不应该被长期引用时，使用弱引用可以防止该对象被意外地保留，从而避免潜在的内存泄漏。
+
+**弱引用缓存示例：**
+
+```java
+import java.lang.ref.WeakReference;
+import java.util.HashMap;
+import java.util.Map;
+
+public class CacheExample {
+
+    private Map<String, WeakReference<MyHeavyObject>> cache = new HashMap<>();
+
+    public MyHeavyObject get(String key) {
+        WeakReference<MyHeavyObject> ref = cache.get(key);
+        if (ref != null) {
+            return ref.get();
+        } else {
+            MyHeavyObject obj = new MyHeavyObject();
+            cache.put(key, new WeakReference<>(obj));
+            return obj;
+        }
+    }
+
+    // 假设 MyHeavyObject 是一个占用大量内存的对象
+    private static class MyHeavyObject {
+        private byte[] largeData = new byte[1024 * 1024 * 10]; // 10MB data
+    }
+}
+```
+
+在这个例子中，使用 `WeakReference` 来存储 `MyHeavyObject` 实例，当内存压力增大时，垃圾回收器可以自由地回收这些对象，而不会影响缓存的正常运行。
+
+如果一个对象被垃圾回收，下次尝试从缓存中获取时，`get()` 方法会返回 `null`，这时我们可以重新创建对象并将其放入缓存中。因此，使用弱引用时要注意，一旦对象被垃圾回收，通过弱引用获取的对象可能会变为 `null`，因此在使用前通常需要检查这一点。
+
+### 软引用 vs 弱引用
+
+| 对比维度 | 软引用（SoftReference） | 弱引用（WeakReference） |
+|----------|------------------------|------------------------|
+| GC 行为 | 内存不足时才回收 | 下次 GC 时一定回收 |
+| 适用场景 | 内存敏感的缓存（希望尽量保留） | 避免内存泄漏（不希望长期持有） |
+| 生命周期 | 较长（直到内存压力出现） | 较短（一次 GC 就回收） |
+| 典型应用 | 图片缓存、大数据对象缓存 | WeakHashMap、监听器注册表 |
+
+**面试回答建议：** Java 有四种引用类型：强引用（永不回收）、软引用（内存不足时回收）、弱引用（下次 GC 一定回收）、虚引用（随时回收，get() 返回 null）。弱引用常用于缓存系统和避免内存泄漏，典型应用是 `WeakHashMap`。软引用适合内存敏感的缓存，弱引用适合不希望长期持有的场景。
