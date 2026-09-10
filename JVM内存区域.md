@@ -535,3 +535,94 @@ public class CacheExample {
 | 典型应用 | 图片缓存、大数据对象缓存 | WeakHashMap、监听器注册表 |
 
 **面试回答建议：** Java 有四种引用类型：强引用（永不回收）、软引用（内存不足时回收）、弱引用（下次 GC 一定回收）、虚引用（随时回收，get() 返回 null）。弱引用常用于缓存系统和避免内存泄漏，典型应用是 `WeakHashMap`。软引用适合内存敏感的缓存，弱引用适合不希望长期持有的场景。
+
+---
+
+## 八、内存泄漏与内存溢出
+
+### 核心区别
+
+**内存泄漏（Memory Leak）** 是"因"——不再使用的对象仍被引用，GC 无法回收，内存被慢慢蚕食。程序不会立刻崩，但可用内存持续减少。
+
+**内存溢出（OOM）** 是"果"——JVM 申请内存时发现不够了，抛出 `OutOfMemoryError`。
+
+**关系：内存泄漏积累到一定程度 → 内存溢出。**
+
+```
+静态 HashMap 不断 put 对象（泄漏）
+    ↓
+堆内存逐渐被占满
+    ↓
+新对象无法分配（溢出）
+    ↓
+java.lang.OutOfMemoryError: Java heap space
+```
+
+### 对比表
+
+| 对比维度 | 内存泄漏 | 内存溢出 |
+|----------|----------|----------|
+| 本质 | 对象该回收但没被回收 | 内存不够用了 |
+| 表现 | 内存缓慢增长，程序暂时正常 | 直接抛 `OutOfMemoryError`，程序崩溃 |
+| 原因 | 静态集合未清理、事件监听未取消、线程未停止 | 大量对象创建、持久引用累积、线程过多 |
+| 发现难度 | 隐蔽，需要 profiling 工具（MAT、JProfiler） | 明显，有异常栈 |
+| 类比 | 水龙头没关紧，水慢慢漏 | 水池满了溢出来 |
+
+### 内存泄漏常见原因
+
+| 场景 | 说明 | 示例 |
+|------|------|------|
+| **静态集合** | 使用静态数据结构（如 `HashMap`、`ArrayList`）存储对象且未清理 | `static List<Object> cache = new ArrayList<>()` 不断 add 从不 remove |
+| **事件监听** | 注册了监听器但未取消，对象持续被引用 | `addListener()` 后未调用 `removeListener()` |
+| **线程未停止** | 线程持有对象引用，线程不结束对象就无法回收 | 线程池中的线程引用了大对象 |
+| **未关闭资源** | IO 流、数据库连接、网络连接未关闭 | `Connection`、`InputStream` 未 `close()` |
+| **内部类持有外部类引用** | 非静态内部类隐式持有外部类实例 | `Handler` 在 Android 中持有 Activity 引用 |
+
+### 内存溢出常见原因
+
+| 场景 | 说明 | 错误信息 |
+|------|------|----------|
+| **大量对象创建** | 程序中不断创建大量对象，超出 JVM 堆限制 | `Java heap space` |
+| **持久引用累积** | 大型数据结构（缓存、集合）长时间持有对象引用 | `Java heap space` |
+| **线程过多** | 每个线程需要独立栈空间，线程数过多时申请栈内存失败 | `unable to create new native thread` |
+| **元空间超限** | 类加载过多，超出 MaxMetaspaceSize | `Metaspace` |
+| **直接内存不足** | NIO DirectByteBuffer 分配过多 | `Direct buffer memory` |
+
+> **注意**：深度递归触发的是 `StackOverflowError`，不属于 OOM，二者是不同的 Error。
+
+### 排查手段
+
+**内存泄漏排查：**
+
+```bash
+# 1. 导出 heap dump
+jmap -dump:format=b,file=heap.hprof <pid>
+
+# 2. 用 MAT（Memory Analyzer Tool）分析
+#    - 查看 Dominator Tree（最大对象）
+#    - 查看 Leak Suspects（自动分析泄漏嫌疑）
+#    - 查看 GC Roots 引用链，找到谁持有对象
+
+# 3. 实时监控
+jstat -gcutil <pid> 1000    # 每秒查看 GC 情况
+jmap -histo <pid> | head -20  # 查看实例数量 top 20
+```
+
+**内存溢出排查：**
+
+```bash
+# 1. 添加 JVM 参数，OOM 时自动 dump
+-XX:+HeapDumpOnOutOfMemoryError
+-XX:HeapDumpPath=/path/to/dump/
+
+# 2. 分析 dump 文件
+#    - 用 MAT 或 JProfiler 打开 heap.hprof
+#    - 查看 OOM 时的对象分布
+#    - 找大对象和引用链
+
+# 3. 调整 JVM 参数（临时缓解）
+-Xms512m -Xmx2g           # 增大堆内存
+-XX:MaxMetaspaceSize=512m  # 增大元空间
+```
+
+**面试回答建议：** 内存泄漏是对象不再使用但仍被引用导致 GC 无法回收，是"慢病"；内存溢出是 JVM 无法分配足够内存时抛出的 OOM，是"急性发作"。泄漏积累到一定程度就会引发溢出。排查泄漏用 MAT 分析 heap dump，找 GC Roots 引用链；排查溢出先看错误类型（heap/Metaspace/direct memory），再针对性调整参数或优化代码。
