@@ -16,6 +16,8 @@
 | [Java 面试脑图](./Java面试知识脑图.md) | 含 3 张 Mermaid 脑图：Java 知识体系 + JVM 内存区域 + JVM 垃圾回收（[钉钉文档](https://alidocs.dingtalk.com/i/nodes/R1zknDm0WR6XzZ4LtzmZNjMdWBQEx5rG)） | 全难度 |
 | [AI Agent 脑图](./AI-Agent知识脑图.md) | 含 4 张 Mermaid 脑图：Agent 知识体系 + 设计模式对比 + 技术栈关系（[钉钉文档](https://alidocs.dingtalk.com/i/nodes/EpGBa2Lm8aZxe5myCz69NZXaWgN7R35y)） | 中级 / 高级 |
 | [系统设计专题](./系统设计专题.md) | 秒杀系统、短链系统、Feed 流、分布式 ID、排行榜、分布式限流 + 面试方法论 | 高级 |
+| [Redis 知识点](./Redis知识点.md) | 9 种数据类型 + 底层结构、持久化、过期/淘汰、分布式锁、主从/哨兵/集群、缓存设计 | 中级 / 高级 |
+| [Redis 全景图](./Redis全景图.html) | 可视化知识图（浏览器打开），7 大模块 6 色分区、AOF/RDB 对比、缓存一致性策略 | 中级 / 高级 |
 
 ## 可视化图示索引
 
@@ -26,6 +28,7 @@
 | [面试知识脑图](./面试知识脑图.html) | Java + Agent 合辑（标签页切换） | HTML（浏览器打开） |
 | [JVM 内存区域全景图](./JVM内存区域全景图.html) | 5 大内存区域 + 分代结构 + OOM 速查 | HTML（浏览器打开） |
 | [JVM 垃圾回收全景图](./JVM垃圾回收全景图.html) | 回收算法 + 收集器演进 + 调优参数 | HTML（浏览器打开） |
+| [Redis 全景图](./Redis全景图.html) | 7 大模块 + 9 种数据类型 + 持久化 + 高可用 + 缓存 | HTML（浏览器打开） |
 
 ## 持续更新中
 
@@ -34,6 +37,7 @@
 - [x] Java 面试 + AI Agent 思维导图
 - [ ] Spring Boot 微服务面试题
 - [x] 系统设计专题（秒杀、短链、Feed 流、分布式 ID、排行榜、限流）
+- [x] Redis 知识全景图（9 种数据类型 + 持久化 + 高可用 + 缓存设计）
 - [ ] 算法题解（LeetCode 高频）
 - [ ] 项目经历 STAR 模板
 
