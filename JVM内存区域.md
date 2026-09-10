@@ -301,6 +301,37 @@ Java 8 起，永久代（PermGen）被元空间替代。元空间存储类元数
 
 > 变更原因：永久代容量受限、GC 效率低、HotSpot 与 JRockit 合并（JRockit 无 PermGen）
 
+**元空间会 OOM 吗？**
+
+**会。** 元空间使用本地内存，默认不设上限，但以下情况仍会 OOM：
+
+- 手动设了 `-XX:MaxMetaspaceSize` 且被超出
+- 物理内存耗尽，被操作系统 OOM Killer 杀掉（这种情况没有 Java 异常栈）
+
+**常见诱因：**
+
+| 场景 | 说明 |
+|------|------|
+| 动态代理 / CGLIB | 运行时大量生成新类，类元数据持续膨胀 |
+| 热部署 | 反复创建 ClassLoader，旧 ClassLoader 无法卸载 |
+| Groovy / JSP | 动态语言编译产生大量新类 |
+| ClassLoader 泄漏 | 被加载的类持有外部引用，导致整个 ClassLoader 无法 GC |
+
+> **面试关键点**："元空间不会 OOM"是误解。永久代默认约 82MB 上限，很容易触顶；元空间默认不限，**不容易** OOM，但不是**不会**。
+
+**排查手段：**
+
+```bash
+# 观察类加载情况
+-XX:+PrintClassLoading
+
+# 查看各 ClassLoader 加载了多少类
+jcmd <pid> VM.classloader_stats
+
+# NMT 查看 Metaspace 详细占用
+jcmd <pid> VM.native_memory summary
+```
+
 ---
 
 ## 三、非 JVM 规范区域
