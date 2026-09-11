@@ -332,6 +332,65 @@ jcmd <pid> VM.classloader_stats
 jcmd <pid> VM.native_memory summary
 ```
 
+### JDK 1.7 → 1.8 内存区域变化
+
+**核心变化：方法区从永久代（PermGen，堆内）改为元空间（Metaspace，本地内存）**。字符串常量池和静态变量提前在 JDK 1.7 就从方法区移到了堆中。
+
+**变化总览：**
+
+| 内容 | JDK 1.7 及更早 | JDK 1.8+ | 原因 |
+|------|----------------|----------|------|
+| **方法区实现** | 永久代 PermGen（堆内） | 元空间 Metaspace（本地内存） | 永久代容量受限、GC 效率低、HotSpot 与 JRockit 合并 |
+| **字符串常量池** | 方法区（JDK 6 及更早）/ 堆（JDK 7 起） | 堆 | 避免永久代 OOM，让字符串可被堆 GC 回收 |
+| **静态变量** | 方法区 | 堆（JDK 7 起） | 跟随常量池一起迁移 |
+| **OOM 错误信息** | `OutOfMemoryError: PermGen space` | `OutOfMemoryError: Metaspace` | 实现机制变了 |
+
+**1. 永久代 → 元空间**
+
+JDK 1.7 及更早，方法区在 JVM 内存模型里叫"永久代"（Permanent Generation），是 Java 堆的一部分，受 `-XX:MaxPermSize` 限制（默认约 82MB）。
+
+JDK 1.8 取消了永久代，方法区改由"元空间"实现，使用的是**本地内存**（Native Memory），默认**没有上限**（只受物理内存限制），可通过 `-XX:MaxMetaspaceSize` 设置上限。
+
+**2. 字符串常量池移到堆中**
+
+这个变化从 JDK 1.7 开始。JDK 1.6 及更早，字符串常量池在方法区（永久代）里，大量字符串容易导致 `PermGen space` OOM。JDK 1.7 把字符串常量池移到了 Java 堆，JDK 1.8 保持这一设计。
+
+**3. 静态变量移到堆中**
+
+和字符串常量池一样，静态变量在 JDK 1.7 也从方法区移到了堆中，跟随对象实例一起管理。
+
+**4. OOM 错误信息变化**
+
+```java
+// JDK 1.7 及更早
+java.lang.OutOfMemoryError: PermGen space
+
+// JDK 1.8+
+java.lang.OutOfMemoryError: Metaspace
+```
+
+**内存布局对比：**
+
+```
+JDK 1.7 及更早：              JDK 1.8+：
+┌──────────────┐            ┌──────────────┐
+│  堆（Heap）   │            │  堆（Heap）   │
+│  Eden/S0/S1  │            │  Eden/S0/S1  │
+│  Old         │            │  Old         │
+│  字符串常量池  │            │  字符串常量池  │
+│  静态变量     │            │  静态变量     │
+├──────────────┤            ├──────────────┤
+│  永久代 PermGen│            │  直接内存      │
+│  类元数据     │            │  DirectBuffer │
+│  方法信息     │            └──────────────┘
+│  常量池       │                  ↓
+└──────────────┘           本地内存（Native Memory）
+                                  元空间 Metaspace
+                                  类元数据/方法信息/常量池
+```
+
+> **面试回答建议**：JDK 1.8 最大的内存区域变化是方法区从永久代改为元空间。永久代在堆内，容量受限、GC 效率低；元空间使用本地内存，默认没有上限。字符串常量池和静态变量在 JDK 1.7 就从方法区移到了堆中，让字符串能被堆 GC 回收。OOM 错误信息也从 `PermGen space` 变成了 `Metaspace`。
+
 ---
 
 ## 三、非 JVM 规范区域
